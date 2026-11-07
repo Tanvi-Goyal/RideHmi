@@ -4,6 +4,7 @@ import com.ridehmi.core.domain.repository.VehicleRepository
 import com.ridehmi.core.model.VehicleReading
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 
 /** Tests push readings with [emit], or make the source throw with [fail]. */
@@ -15,8 +16,13 @@ class FakeVehicleRepository : VehicleRepository {
         readings.collect { emit(it.getOrThrow()) }
     }
 
-    suspend fun emit(reading: VehicleReading) = readings.emit(Result.success(reading))
+    suspend fun emit(reading: VehicleReading) = send(Result.success(reading))
 
     suspend fun fail(error: Throwable = IllegalStateException("vehicle bus failed")) =
-        readings.emit(Result.failure(error))
+        send(Result.failure(error))
+
+    private suspend fun send(result: Result<VehicleReading>) {
+        readings.subscriptionCount.first { it > 0 }
+        readings.emit(result)
+    }
 }
