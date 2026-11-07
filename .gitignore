@@ -1,0 +1,18 @@
+# Gradle and build output (every module, not just the root)
+.gradle/
+build/
+.kotlin/
+.externalNativeBuild
+.cxx
+
+# Machine-specific
+local.properties
+.idea/
+*.iml
+.DS_Store
+captures/
+
+# Signing secrets
+*.jks
+*.keystore
+keystore.properties
