@@ -130,18 +130,38 @@ the emulator. Not needed for the MVP.
 - The screen stays on "Connecting" until Phase 2 wires the use case.
 - Branch `feat/data-simulator`, commit `feat: simulate a vehicle ride`.
 
-### Phase 2 — Domain
-- `VehicleSignalValidator`: speed NaN/∞ → Invalid(NOT_A_NUMBER); < 0 → Invalid(NEGATIVE);
-  > max → Invalid(ABOVE_PLAUSIBLE_MAX); null → Missing. Motor and kill switch: null → Missing.
-- `RideStateMachine.reduce(current, status)` — pure, table-tested (rules below).
-- `ObserveVehicleDashboard`:
-  - drop readings whose timestamp is not newer than the last one (out-of-order / duplicates);
-  - `scan` through the state machine;
-  - `transformLatest { emit(Live); delay(staleAfter); emit(SignalLost) }` for stale data;
-  - `retryWhen` with a short delay on source errors, emitting `SignalLost` meanwhile; never crash;
-  - `distinctUntilChanged` so identical frames don't recompose.
-- Tests: state machine table, validator boundaries, stale after 3 s of silence and recovery,
-  out-of-order drop, error → SignalLost → recovers.
+### Phase 2 — Domain (done, in review)
+
+Goal: turn raw readings into what the dashboard shows, and never show a value we can't trust.
+
+```
+raw readings
+  ① drop late or repeated readings        (timestamp not newer than the last one)
+  ② validate each signal                   VehicleSignalValidator → Valid | Missing | Invalid
+  ③ work out the ride state                RideStateMachine.next(previousSpeed, status)
+  ④ Live(status, rideState)
+  ⑤ source throws → SignalLost, wait 1 s, reconnect
+  ⑥ Connecting first
+  ⑦ no new reading for 3 s → SignalLost    (also when no reading ever arrives)
+  ⑧ skip repeats
+VehicleDashboard: Connecting | Live | SignalLost
+```
+
+Speed validation (`VehicleLimits`):
+
+| Raw speed | Result |
+|---|---|
+| `null` | Missing |
+| NaN or ∞ | Invalid (NOT_A_NUMBER) |
+| below −1 | Invalid (NEGATIVE) |
+| −1 up to 0 | Valid(0), sensor noise |
+| 0 to 150 | Valid |
+| above 150 | Invalid (ABOVE_PLAUSIBLE_MAX) |
+
+Motor and kill switch: `null` → Missing, otherwise Valid.
+
+Tests (`core/domain/src/test`, JVM, virtual time, `FakeVehicleRepository`, Turbine):
+`VehicleSignalValidatorTest`, `RideStateMachineTest`, `ObserveVehicleDashboardTest`.
 
 ### Phase 3 — UI
 - `DashboardUiState.Content`: speed text, motor (ON/OFF), kill switch (Active/Inactive/Unknown),
@@ -155,31 +175,29 @@ the emulator. Not needed for the MVP.
 ### Phase 4 — Docs and submission
 README (build/run, architecture, assumptions/limitations, how to run tests), screenshots, GitHub repo.
 
-## State machine (proposal — confirm before Phase 2)
+## State machine
 
-States: `PARKED, READY, RIDING, ACCELERATING, MOTOR_DISABLED, UNKNOWN`.
+`RideStateMachine.next(previousSpeedKmh, status)`. Rules are checked in order; the first match wins.
 
-| Priority | Condition | Next state |
+| # | If… | State |
 |---|---|---|
-| 1 | kill switch Active | MOTOR_DISABLED (speed still shown as reported) |
-| 2 | motor or speed not Valid | UNKNOWN |
-| 3 | motor OFF, speed 0 | PARKED |
-| 4 | motor ON, speed 0 | READY |
-| 5 | motor ON, speed > 0, speed rose ≥ threshold since last reading | ACCELERATING |
-| 6 | motor ON, speed > 0, otherwise | RIDING |
-| 7 | motor OFF, speed > 0, kill switch Inactive | same as 5–6 (decision 2) |
+| 1 | kill switch ACTIVE | MOTOR_DISABLED (speed still shown as reported) |
+| 2 | any signal Missing or Invalid | UNKNOWN |
+| 3 | speed 0, motor OFF | PARKED |
+| 4 | speed 0, motor ON | READY |
+| 5 | speed rose ≥ 1 km/h since the last reading | ACCELERATING |
+| 6 | otherwise (moving, motor ON or OFF) | RIDING |
 
-The previous state matters because "accelerating" needs the last speed, so the reducer takes the
-previous speed too (kept in the `scan` accumulator).
+The previous speed is the only memory it needs, to tell accelerating from riding.
 
 ## Edge cases covered
 
 | Case | Handling |
 |---|---|
 | Negative / NaN / ∞ / implausibly high speed | `Invalid`, shown as "--", never crashes |
-| One signal missing in a frame | That signal `Missing`, others still shown |
-| No frames for 3 s (stale) | `SignalLost`: values hidden, warning shown |
-| Source throws | Caught, `SignalLost`, retried |
+| One signal missing in a frame | That signal `Missing`, others still shown, ride state UNKNOWN |
+| No frames for 3 s (stale), or none ever | `SignalLost`: values hidden, warning shown |
+| Source throws | Caught, `SignalLost`, retried after 1 s |
 | Out-of-order / duplicate frames | Dropped by monotonic timestamp |
 | Motor OFF while moving | Allowed (doc: not a safety rule), see decision 2 |
 | Kill switch Active while moving | MOTOR_DISABLED, real speed still displayed |

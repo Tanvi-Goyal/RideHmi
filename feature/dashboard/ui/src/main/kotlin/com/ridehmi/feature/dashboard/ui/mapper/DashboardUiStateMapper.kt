@@ -5,6 +5,6 @@ import com.ridehmi.feature.dashboard.ui.DashboardUiState
 
 internal fun VehicleDashboard.toUiState(): DashboardUiState = when (this) {
     VehicleDashboard.Connecting -> DashboardUiState.Connecting
-    is VehicleDashboard.Live -> TODO("Phase 3")
-    VehicleDashboard.SignalLost -> TODO("Phase 3")
+    is VehicleDashboard.Live -> DashboardUiState.Connecting
+    VehicleDashboard.SignalLost -> DashboardUiState.Connecting
 }

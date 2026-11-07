@@ -1,9 +1,7 @@
 package com.ridehmi.core.domain.validation
 
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
-
-data class VehicleLimits(
-    val maxPlausibleSpeedKmh: Float = 150f,
-    val staleAfter: Duration = 3.seconds,
-)
+object VehicleLimits {
+    const val MAX_SPEED_KMH = 150f
+    const val SPEED_NOISE_FLOOR_KMH = -1f
+    const val ACCELERATION_STEP_KMH = 1f
+}

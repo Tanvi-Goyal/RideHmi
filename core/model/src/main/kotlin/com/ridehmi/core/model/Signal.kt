@@ -7,3 +7,5 @@ sealed interface Signal<out T> {
 }
 
 enum class InvalidReason { NOT_A_NUMBER, NEGATIVE, ABOVE_PLAUSIBLE_MAX }
+
+fun <T> Signal<T>.valueOrNull(): T? = (this as? Signal.Valid)?.value
