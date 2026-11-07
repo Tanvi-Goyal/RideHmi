@@ -20,5 +20,7 @@ internal object PlatformModule {
     fun providesDefaultDispatcher(): CoroutineDispatcher = Dispatchers.Default
 
     @Provides
-    fun providesMonotonicClock(): MonotonicClock = MonotonicClock { SystemClock.elapsedRealtime() }
+    fun providesMonotonicClock(): MonotonicClock = MonotonicClock {
+        SystemClock.elapsedRealtime()
+    }
 }
