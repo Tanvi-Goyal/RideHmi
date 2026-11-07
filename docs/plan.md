@@ -20,14 +20,14 @@ build-logic (ridehmi.* convention plugins)
 
 | Module | Holds |
 |---|---|
-| `:core:model` (JVM) | `VehicleReading` (raw), `Signal<T>`, `VehicleStatus`, `RideState`, `VehicleFeed`, `MonotonicClock` |
-| `:core:domain` (JVM) | `VehicleRepository` port, `VehicleSignalValidator`, `RideStateMachine`, `ObserveVehicleFeed`, `@Dispatcher` |
+| `:core:model` (JVM) | `VehicleReading` (raw), `Signal<T>`, `VehicleStatus`, `RideState`, `VehicleDashboard`, `MonotonicClock` |
+| `:core:domain` (JVM) | `VehicleRepository` port, `VehicleSignalValidator`, `RideStateMachine`, `ObserveVehicleDashboard`, `@Dispatcher` |
 | `:core:data` | `VehicleDataSource` + `SimulatedVehicleDataSource`, `VehicleRepositoryImpl`, Hilt modules (dispatcher, clock) |
 | `:core:designsystem` | Always-dark HMI theme, status colours, text styles, strings |
 | `:feature:dashboard:ui` | `DashboardViewModel`, `DashboardUiState`, mapper, `DashboardScreen` |
 | `:app` | `HmiApplication` (Hilt root), `MainActivity` (landscape, keep screen on) |
 
-Data flow: `SimulatedVehicleDataSource` → `VehicleRepository` (flowOn Default) → `ObserveVehicleFeed`
+Data flow: `SimulatedVehicleDataSource` → `VehicleRepository` (flowOn Default) → `ObserveVehicleDashboard`
 (order check → validate → state machine → staleness → error recovery) → `DashboardViewModel`
 (`stateIn`, `WhileSubscribed(5s)`) → `collectAsStateWithLifecycle` → stateless `DashboardScreen`.
 
@@ -39,121 +39,102 @@ Each phase: build → tests green → you review → next.
 Modules, convention plugins, version catalog, Hilt wiring, contracts and stubs. App launches in
 landscape showing "Connecting to vehicle…". One smoke test.
 
-### Phase 1 — Data layer
+### Phase 1 — Data layer (done, in review)
 
-Goal: a simulator that plays a script of raw readings, about one a second, on a background
-dispatcher. The data layer passes values through **unchanged**, including bad ones; judging them
-is the domain's job (Phase 2). Done when every item below has a passing test.
+Goal: a fake vehicle that sends one reading a second, on a background thread. The data layer
+passes values through **unchanged**, including bad ones; judging them is the domain's job (Phase 2).
 
-#### 1.1 Script model — `core/data/.../simulation/`
-- `ScenarioStep` (sealed, internal):
-  - `Emit(label, speedKmh: Float?, motorOn: Boolean?, killSwitchActive: Boolean?, holdTicks: Int = 1, timestampSkewMillis: Long = 0)`;
-    `init { require(holdTicks >= 1) }`. `null` = signal missing from that reading.
-  - `Silence(ticks: Int)`: emit nothing for that long (stale-data case).
-  - `Fail(message)`: throw `VehicleBusException` (source failure case).
-- `SimulationConfig(script: List<ScenarioStep>, tick: Duration = 1.seconds, loop: Boolean = true)`.
-- `VehicleBusException(message) : IOException`.
+#### How a reading travels
+```
+SimulatedVehicleDataSource      VehicleRepositoryImpl     ObserveVehicleDashboard (Phase 2)    DashboardViewModel     DashboardScreen
+  plays a list of samples   ──►   moves it off the    ──►   checks values, works out  ──►   turns it into     ──►  draws it
+  one per second, forever         main thread               the ride state, spots          UI state (StateFlow)
+                                  (flowOn Default)          missing / stale data
+        :core:data                    :core:data                 :core:domain               :feature:dashboard:ui
+```
 
-#### 1.2 Normal script — `RideScripts.normalRide` (17 readings, then loops)
+#### The ride, second by second (17 s, then it starts again)
+```
+second   0  1  2 | 3  4  5 | 6  7  8 | 9  10 11 12 13 | 14 15 16 | 17 ...
+speed    0  0  0 | 0  0  0 | 25 25 25| 30 35 40 45 50 | 0  0  0  | 0 (again)
+motor    OFF     | ON      | ON      | ON             | OFF       |
+kill sw  off     | off     | off     | off            | ON        |
+         Parked    Ready     Riding    Accelerating     Motor disabled
+```
+Accelerating is a rising ramp: holding 50 would read as Riding from the second sample (decision 1).
 
-| Step | Readings | Speed | Motor | Kill switch | State the domain will show |
-|---|---|---|---|---|---|
-| Parked | 3 | 0 | OFF | Inactive | PARKED |
-| Ready | 3 | 0 | ON | Inactive | READY |
-| Riding | 3 | 25 | ON | Inactive | ACCELERATING once (0→25), then RIDING ×2 |
-| Accelerating | 5 | 30, 35, 40, 45, 50 | ON | Inactive | ACCELERATING ×5 |
-| Motor disabled | 3 | 0 | OFF | Active | MOTOR_DISABLED |
-
-Why a ramp for Accelerating: with the speed-change rule (decision 1), holding 50 would show RIDING
-from the second reading. A rising ramp keeps it ACCELERATING and ends at the doc's 50 km/h. The ramp
-step (5 km/h) must stay above the Phase 2 acceleration threshold.
-
-#### 1.3 Fault script — `RideScripts.withFaults` = one normal ride, then:
-
-| Step | Readings | Raw values | Edge case it exercises |
-|---|---|---|---|
-| Coasting | 2 | 20, OFF, Inactive | Motor OFF while moving (decision 2) |
-| Negative speed | 2 | -5, ON, Inactive | Invalid → "--" |
-| Sensor noise | 1 | -0.4, ON, Inactive | Clamp-to-0 rule (decision 5) |
-| Not a number | 1 | NaN, ON, Inactive | Invalid → "--" |
-| Implausible | 1 | 400, ON, Inactive | Above max → "--" |
-| Speed missing | 2 | null, ON, Inactive | Missing → "--", others still shown |
-| Motor missing | 1 | 25, null, Inactive | Missing motor |
-| Out of order | 1 | 25, ON, Inactive, timestamp −1500 ms | Dropped by the domain |
-| Silence | 5 ticks | — | Stale → SignalLost after 3 s, then recovers |
-| Fail | — | throws | Domain catches, shows SignalLost, retries |
-
-`Fail` is last on purpose: the domain's retry re-collects the cold flow, which restarts the script,
-so recovery and looping are the same thing.
-
-#### 1.4 `SimulatedVehicleDataSource`
+#### Code — `core/data/.../source/SimulatedVehicleDataSource.kt`
 ```kotlin
-override fun readings(): Flow<VehicleReading> = flow {
-    do {
-        for (step in config.script) when (step) {
-            is Emit -> repeat(step.holdTicks) {
-                emit(step.toReading(clock.nowMillis() + step.timestampSkewMillis))
-                delay(config.tick)
+internal class SimulatedVehicleDataSource @Inject constructor(
+    private val clock: MonotonicClock,
+) : VehicleDataSource {
+
+    override fun readings(): Flow<VehicleReading> = flow {
+        while (true) {
+            for (sample in RideSamples.normal) {
+                emit(sample.toReading(clock.nowMillis()))
+                delay(1.seconds)
             }
-            is Silence -> delay(config.tick * step.ticks)
-            is Fail -> throw VehicleBusException(step.message)
         }
-    } while (config.loop)
+    }
 }
 ```
-- Emits first, then waits, so the screen leaves "Connecting" straight away instead of after 1 s.
-- Cold flow: each collector gets its own run from the start. `delay` keeps it cancellable.
-- Timestamps come from the injected `MonotonicClock` (`SystemClock.elapsedRealtime` in the app), not wall time.
-- "About once a second": `delay` after each emit can drift by a few ms per tick. That's fine for a
-  display; the domain uses reading timestamps, not tick counts.
+- Sends first, then waits, so the screen leaves "Connecting" straight away.
+- `flow {}` is cold and `delay` is cancellable: it stops when the screen stops collecting.
+- Timestamps come from `MonotonicClock`, not wall time.
 
-#### 1.5 Repository and DI
-- `VehicleRepositoryImpl.observeReadings() = dataSource.readings().flowOn(Default)` (already in place).
-  No conflation needed at 1 Hz; the ViewModel's `StateFlow` conflates at the end.
-- `SimulationModule` (`@Provides SimulationConfig`): picks `withFaults` when
-  `BuildConfig.SIMULATE_FAULTS` is true, otherwise `normalRide`.
-- `:core:data` gets `buildConfig = true` and
-  `buildConfigField("boolean", "SIMULATE_FAULTS", <gradle property ridehmi.simulateFaults, default false>)`.
-  Run with faults: `./gradlew installDebug -Pridehmi.simulateFaults=true`.
+#### Code — `core/data/.../source/RideSamples.kt`
+```kotlin
+internal data class Sample(val speedKmh: Float, val motor: MotorState, val killSwitch: KillSwitchState)
 
-#### 1.6 Tests — `core/data/src/test/` (JVM, `runTest` virtual time, clock = `testScheduler.currentTime`)
+internal object RideSamples {
+    val normal: List<Sample> =
+        List(3) { Sample(0f, MotorState.OFF, KillSwitchState.INACTIVE) } +    // Parked
+        List(3) { Sample(0f, MotorState.ON, KillSwitchState.INACTIVE) } +     // Ready
+        List(3) { Sample(25f, MotorState.ON, KillSwitchState.INACTIVE) } +    // Riding
+        listOf(30f, 35f, 40f, 45f, 50f).map { Sample(it, MotorState.ON, KillSwitchState.INACTIVE) } + // Accelerating
+        List(3) { Sample(0f, MotorState.OFF, KillSwitchState.ACTIVE) }       // Motor disabled
+}
+```
+`VehicleReading` carries `MotorState?` (`ON`/`OFF`) and `KillSwitchState?` (`ACTIVE`/`INACTIVE`),
+the same words the UI shows. null = missing.
 
-`RideScriptsTest`
-- normal ride plays Parked → Ready → Riding → Accelerating → Motor disabled with the exact values above
-- Riding holds 25 for at least 3 readings (decision 1)
-- Accelerating ramp is strictly rising and ends at 50
-- `Emit` with `holdTicks = 0` is rejected
+#### Where the edge cases are tested
+The simulator only plays the clean ride. Bad data is fed in by tests, using the
+`FakeVehicleRepository` already in `:core:testing`, so each case is one small test in Phase 2:
 
+| Edge case | How the test feeds it |
+|---|---|
+| Negative / NaN / 400 km/h speed | `repo.emit(reading(speed = -5f))` |
+| Missing speed or motor | `repo.emit(reading(speed = null))` |
+| Stale data | emit once, then `advanceTimeBy(3.seconds)` with nothing sent |
+| Old reading arrives late | emit t=2000, then t=1000 |
+| Source fails | `repo.fail(IOException())` |
+| Motor OFF while moving | `repo.emit(reading(speed = 20f, motor = MotorState.OFF))` |
+
+Optional later: a second sample list with bad values, switched on by a debug flag, to show them on
+the emulator. Not needed for the MVP.
+
+#### Tests — `core/data/src/test/` (`runTest` virtual time)
 `SimulatedVehicleDataSourceTest`
-- first reading at t = 0, then one every 1000 ms
-- one full cycle is exactly the 17 expected readings, in order
-- loops: reading 18 is Parked again
-- timestamps come from the clock and rise strictly (apart from the skewed step)
-- `Silence(5)` leaves a 5 s gap with no readings
-- `Fail` ends the flow with `VehicleBusException`
-- bad values (−5, NaN, 400, null) come out unchanged
-- `loop = false` completes after one pass
+- first reading comes at t = 0, then one every 1000 ms
+- the first 17 readings are the ride above, in order
+- reading 18 is Parked again (it loops)
+- timestamps come from the clock
 
 `VehicleRepositoryImplTest`
-- passes readings through unchanged from a fake data source
-- runs the source on the injected dispatcher
+- passes readings through unchanged
 
-#### 1.7 Verify
-- `./gradlew :core:data:testDebugUnitTest` green, then the full command in AGENTS.md.
-- No on-device check yet: `ObserveVehicleFeed` is still a stub, so the screen stays on
-  "Connecting" until Phase 2.
-- Suggested branch and commits: `feat/data-simulator`
-  (`feat: add ride scenario script`, `feat: simulate vehicle readings`, `feat: add fault script behind a build flag`).
-
-#### Not in Phase 1
-- Sharing one source between many collectors (`shareIn`): only one screen collects today.
-- A coast-down ramp after the kill switch (50 → 0): the doc's step goes straight to 0.
+#### Verify
+- `./gradlew :core:data:testDebugUnitTest`, then the full command in AGENTS.md.
+- The screen stays on "Connecting" until Phase 2 wires the use case.
+- Branch `feat/data-simulator`, commit `feat: simulate a vehicle ride`.
 
 ### Phase 2 — Domain
 - `VehicleSignalValidator`: speed NaN/∞ → Invalid(NOT_A_NUMBER); < 0 → Invalid(NEGATIVE);
   > max → Invalid(ABOVE_PLAUSIBLE_MAX); null → Missing. Motor and kill switch: null → Missing.
 - `RideStateMachine.reduce(current, status)` — pure, table-tested (rules below).
-- `ObserveVehicleFeed`:
+- `ObserveVehicleDashboard`:
   - drop readings whose timestamp is not newer than the last one (out-of-order / duplicates);
   - `scan` through the state machine;
   - `transformLatest { emit(Live); delay(staleAfter); emit(SignalLost) }` for stale data;
@@ -169,7 +150,7 @@ override fun readings(): Flow<VehicleReading> = flow {
 - Screen per the reference: big centre speed + km/h, ride-state label, motor pill bottom-right
   (green ON / grey OFF), kill-switch indicator with distinct colour **and** icon/text (not colour alone).
 - Optional: animate speed changes (`animateIntAsState`), immersive mode.
-- Tests: ViewModel maps every `VehicleFeed` case; mapper edge cases; optional Compose UI test.
+- Tests: ViewModel maps every `VehicleDashboard` case; mapper edge cases; optional Compose UI test.
 
 ### Phase 4 — Docs and submission
 README (build/run, architecture, assumptions/limitations, how to run tests), screenshots, GitHub repo.
@@ -214,5 +195,5 @@ previous speed too (kept in the `scan` accumulator).
    needs speed 0.
 3. **Stale data — decided:** show "--" and a signal-lost warning.
 4. **Speed rounding — decided:** `roundToInt()`. The README will note UNECE R39.
-5. **Negative noise — open:** treat every negative as Invalid, or clamp small noise
-   (≥ −1 km/h) to 0 and treat anything lower as Invalid. Recommend clamping. Needed before Phase 2.
+5. **Negative noise — decided:** clamp small noise (−1 km/h up to 0) to 0; anything below −1 is
+   Invalid and shows "--".
