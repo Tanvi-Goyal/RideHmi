@@ -1,7 +1,7 @@
 package com.ridehmi.feature.dashboard.ui
 
 import app.cash.turbine.test
-import com.ridehmi.core.domain.usecase.ObserveVehicleFeed
+import com.ridehmi.core.domain.usecase.ObserveVehicleDashboard
 import com.ridehmi.core.domain.validation.VehicleSignalValidator
 import com.ridehmi.core.testing.repository.FakeVehicleRepository
 import com.ridehmi.core.testing.rules.MainDispatcherRule
@@ -19,7 +19,7 @@ class DashboardViewModelTest {
 
     @Test
     fun `starts in Connecting before any reading arrives`() = runTest {
-        val viewModel = DashboardViewModel(ObserveVehicleFeed(repository, VehicleSignalValidator()))
+        val viewModel = DashboardViewModel(ObserveVehicleDashboard(repository, VehicleSignalValidator()))
 
         viewModel.state.test {
             assertEquals(DashboardUiState.Connecting, awaitItem())
