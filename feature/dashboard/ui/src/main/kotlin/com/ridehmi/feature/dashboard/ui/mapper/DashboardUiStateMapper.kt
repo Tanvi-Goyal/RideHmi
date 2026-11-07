@@ -1,10 +1,10 @@
 package com.ridehmi.feature.dashboard.ui.mapper
 
-import com.ridehmi.core.model.VehicleFeed
+import com.ridehmi.core.model.VehicleDashboard
 import com.ridehmi.feature.dashboard.ui.DashboardUiState
 
-internal fun VehicleFeed.toUiState(): DashboardUiState = when (this) {
-    VehicleFeed.Connecting -> DashboardUiState.Connecting
-    is VehicleFeed.Live -> TODO("Phase 3")
-    VehicleFeed.SignalLost -> TODO("Phase 3")
+internal fun VehicleDashboard.toUiState(): DashboardUiState = when (this) {
+    VehicleDashboard.Connecting -> DashboardUiState.Connecting
+    is VehicleDashboard.Live -> TODO("Phase 3")
+    VehicleDashboard.SignalLost -> TODO("Phase 3")
 }
