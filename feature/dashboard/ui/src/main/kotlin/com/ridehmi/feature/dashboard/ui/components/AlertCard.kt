@@ -16,6 +16,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ridehmi.core.designsystem.R
 import com.ridehmi.core.designsystem.theme.HmiTextStyles
 import com.ridehmi.core.designsystem.theme.StatusColors
@@ -42,9 +43,15 @@ private fun AlertCard(
             modifier = Modifier.size(44.dp)
         )
 
+        val valueStyle = if (value == stringResource(R.string.value_unknown)) {
+            HmiTextStyles.AlertValue.copy(letterSpacing = 4.sp)
+        } else {
+            HmiTextStyles.AlertValue
+        }
+
         Column {
             Text(label, style = HmiTextStyles.AlertLabel, color = textColor)
-            Text(value, style = HmiTextStyles.AlertValue, color = textColor)
+            Text(value, style = valueStyle, color = textColor)
         }
     }
 }

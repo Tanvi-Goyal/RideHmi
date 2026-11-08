@@ -24,6 +24,7 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ridehmi.core.designsystem.R
@@ -128,7 +129,9 @@ private fun SpeedReadout(speedKmh: Int?, height: Dp, modifier: Modifier = Modifi
             text = speedKmh?.toString() ?: stringResource(R.string.value_unknown),
             style = HmiTextStyles.SpeedValue.copy(
                 fontSize = fontSize,
-                lineHeight = fontSize
+                lineHeight = fontSize,
+                letterSpacing = if (speedKmh == null) 12.sp
+                else HmiTextStyles.SpeedValue.letterSpacing,
             ),
             color = MaterialTheme.colorScheme.onBackground,
         )
