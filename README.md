@@ -22,9 +22,6 @@ a second. Built with Kotlin, Jetpack Compose, Coroutines, Flow/StateFlow, ViewMo
 | Parked, Ready, Riding, Accelerating, Motor disabled | `RideSamples.normal`, a 17-second loop; see [Simulated ride](#simulated-ride) |
 | ViewModel-based state management | `DashboardViewModel` exposes one `StateFlow<DashboardUiState>` |
 | Separate UI, ViewModel and data provider | Separate Gradle modules; see [Architecture](#architecture) |
-| At least two edge cases | Eight; see [Edge cases](#edge-cases) |
-| At least two unit tests | 36 unit tests and 2 Compose UI tests |
-| Runs on an emulator in landscape | Landscape is forced in the manifest; full screen with the system bars hidden |
 
 ## Build and run
 
@@ -126,9 +123,6 @@ graph LR
 | 9–13 | 30, 35, 40, 45, 50 | ON | Inactive | Accelerating |
 | 14–16 | 0 | OFF | Active | Motor disabled |
 
-Then it loops. Accelerating ramps up to 50 rather than holding it, because a steady speed is riding.
-This is the "documented equivalent" the assignment allows.
-
 ## Edge cases
 
 | Case | What the dashboard does |
@@ -181,9 +175,6 @@ every look. To regenerate them with an emulator running, run `./scripts/capture-
   speed (UNECE R39), so it would round up and add a calibration margin.
 - **Only the reference items with data are built.** The design's navigation, music, odometer,
   battery, TPMS and parking slider are left out, because there's no data or feature behind them.
-- **Landscape is forced.** From Android 16, fixed orientations are ignored on large screens such as
-  tablets. Phones and the emulator still respect them.
-- **No custom launcher icon.**
 
 ## Credits
 
