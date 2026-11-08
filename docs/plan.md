@@ -163,14 +163,30 @@ Motor and kill switch: `null` → Missing, otherwise Valid.
 Tests (`core/domain/src/test`, JVM, virtual time, `FakeVehicleRepository`, Turbine):
 `VehicleSignalValidatorTest`, `RideStateMachineTest`, `ObserveVehicleDashboardTest`.
 
-### Phase 3 — UI
-- `DashboardUiState.Content`: speed text, motor (ON/OFF), kill switch (Active/Inactive/Unknown),
-  ride state label, signal warning. `SignalLost` state.
-- Mapper does all formatting (rounding, "--" for Missing/Invalid).
-- Screen per the reference: big centre speed + km/h, ride-state label, motor pill bottom-right
-  (green ON / grey OFF), kill-switch indicator with distinct colour **and** icon/text (not colour alone).
-- Optional: animate speed changes (`animateIntAsState`), immersive mode.
-- Tests: ViewModel maps every `VehicleDashboard` case; mapper edge cases; optional Compose UI test.
+### Phase 3 — UI (done, in review)
+
+```
+VehicleDashboard ──► mapper (pure, all formatting) ──► DashboardUiState ──► DashboardScreen (stateless)
+```
+
+Layout, landscape, following the reference image:
+
+| Element | Where | Looks like |
+|---|---|---|
+| Speed + km/h | centre | big white number; `--` when it can't be trusted |
+| Ride state | top centre badge | green label; red for Motor disabled; hidden when UNKNOWN |
+| Kill switch | top right | Active: red box, warning icon, "Active". Inactive: grey outline. Unknown: `--` |
+| Motor | bottom right | ON: green pill, power icon. OFF: grey outline. Unknown: `--` |
+| Signal lost | bottom centre | amber warning; every value shows `--` |
+| Connecting | full screen | "Connecting to vehicle…" |
+
+Status is never shown by colour alone: colour, icon and text change together.
+
+`DashboardUiState.Ride(speedKmh: Int?, rideState, motor: MotorState?, killSwitch: KillSwitchState?, signalLost)`;
+null means "--". Speed is rounded with `roundToInt()`.
+
+Tests: `DashboardUiStateMapperTest`, `DashboardViewModelTest` (JVM), `DashboardScreenTest`
+(Compose, `./gradlew :feature:dashboard:ui:connectedDebugAndroidTest` with an emulator running).
 
 ### Phase 4 — Docs and submission
 README (build/run, architecture, assumptions/limitations, how to run tests), screenshots, GitHub repo.
