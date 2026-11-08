@@ -14,7 +14,6 @@ private val HmiColorScheme = darkColorScheme(
     error = StatusColors.Danger,
 )
 
-/** Always dark: a ride display must not flash bright at night. */
 @Composable
 fun HmiTheme(content: @Composable () -> Unit) {
     MaterialTheme(

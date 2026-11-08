@@ -15,7 +15,6 @@ internal class SimulatedVehicleDataSource @Inject constructor(
     override fun readings(): Flow<VehicleReading> = flow {
         while (true) {
             for (sample in RideSamples.normal) {
-                // Send first, then wait, so the screen leaves "Connecting" straight away.
                 emit(sample.toReading(clock.nowMillis()))
                 delay(1.seconds)
             }

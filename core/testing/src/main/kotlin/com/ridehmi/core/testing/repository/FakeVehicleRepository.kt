@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 
-/** Tests push readings with [emit], or make the source throw with [fail]. */
 class FakeVehicleRepository : VehicleRepository {
 
     private val readings = MutableSharedFlow<Result<VehicleReading>>(extraBufferCapacity = 64)
