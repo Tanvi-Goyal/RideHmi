@@ -18,5 +18,7 @@
     <string name="kill_switch_active">Active</string>
     <string name="kill_switch_inactive">Inactive</string>
 
+    <string name="signal_lost_label">Vehicle signal</string>
+    <string name="signal_lost_value">Lost</string>
     <string name="signal_lost">No signal from vehicle</string>
 </resources>

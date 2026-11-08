@@ -41,7 +41,7 @@ class DashboardScreenTest {
     fun signalLostShowsWarningAndNoValues() {
         show(DashboardUiState.Ride(null, RideState.UNKNOWN, null, null, signalLost = true))
 
-        composeRule.onNodeWithText("No signal from vehicle").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("No signal from vehicle").assertIsDisplayed()
         composeRule.onNodeWithText("--").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Kill switch --").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Motor --").assertIsDisplayed()
