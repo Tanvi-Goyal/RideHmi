@@ -192,8 +192,12 @@ null means "--". Speed is rounded with `roundToInt()`.
 Tests: `DashboardUiStateMapperTest`, `DashboardViewModelTest` (JVM), `DashboardScreenTest`
 (Compose, `./gradlew :feature:dashboard:ui:connectedDebugAndroidTest` with an emulator running).
 
-### Phase 4 — Docs and submission
-README (build/run, architecture, assumptions/limitations, how to run tests), screenshots, GitHub repo.
+### Phase 4 — Docs and submission (done, in review)
+- `README.md`: requirements checklist, build and run, architecture, state management, edge cases,
+  testing, assumptions and limitations, how AI was used, credits.
+- Screenshots in `docs/screenshots/`, rendered by the `DashboardScreenshotCapture` instrumented
+  test; regenerate with `./scripts/capture-screenshots.sh` (emulator running).
+- Checked: unit tests, UI tests, `lint`, `assembleRelease`, and a fresh clone from GitHub builds.
 
 ## State machine
 
