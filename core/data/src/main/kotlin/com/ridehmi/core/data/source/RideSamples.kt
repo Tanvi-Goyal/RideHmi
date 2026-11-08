@@ -18,9 +18,6 @@ internal data class Sample(
 }
 
 internal object RideSamples {
-
-    // 17 seconds: Parked, Ready, Riding, Accelerating, Motor disabled.
-    // Accelerating ramps up to 50 because a steady speed reads as Riding.
     val normal: List<Sample> = List(3) {
         Sample(0f, MotorState.OFF, KillSwitchState.INACTIVE)
     } + List(3) {
