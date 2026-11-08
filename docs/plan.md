@@ -169,16 +169,20 @@ Tests (`core/domain/src/test`, JVM, virtual time, `FakeVehicleRepository`, Turbi
 VehicleDashboard ──► mapper (pure, all formatting) ──► DashboardUiState ──► DashboardScreen (stateless)
 ```
 
-Layout, landscape, following the reference image:
+Layout, landscape, styled after the reference image (numbers are its item labels):
 
 | Element | Where | Looks like |
 |---|---|---|
-| Speed + km/h | centre | big white number; `--` when it can't be trusted |
-| Ride state | top centre badge | green label; red for Motor disabled; hidden when UNKNOWN |
-| Kill switch | top right | Active: red box, warning icon, "Active". Inactive: grey outline. Unknown: `--` |
-| Motor | bottom right | ON: green pill, power icon. OFF: grey outline. Unknown: `--` |
-| Signal lost | bottom centre | amber warning; every value shows `--` |
+| Speed + km/h (#20) | centre, on the deck | big bold Manrope digits, sized from screen height; `--` when untrusted |
+| Speed deck (#23) | under the speed | dark 3D deck; light bar grows from the centre with speed, coloured by ride state |
+| Ride state (#5, #18) | top pod | strip + pill in the state colour; pill hidden when UNKNOWN |
+| Kill switch (#14) | top right | bolt icon + "Kill switch / Active" in red and white; Inactive dimmed grey; `--` when unknown |
+| Motor (#36) | bottom right | ON: dark green pill, green power icon. OFF: dark grey pill. `--` when unknown |
+| Signal lost | under the kill switch | amber "Vehicle signal / Lost"; every value shows `--` |
 | Connecting | full screen | "Connecting to vehicle…" |
+
+The other reference items (nav, music, ODO, battery, TPMS, parking slider) are left out: we have
+no data behind them. System bars are hidden; a swipe shows them.
 
 Status is never shown by colour alone: colour, icon and text change together.
 
