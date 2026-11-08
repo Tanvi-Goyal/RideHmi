@@ -2,4 +2,23 @@
 <resources>
     <string name="dashboard_connecting">Connecting to vehicle…</string>
     <string name="unit_kmh">km/h</string>
+    <string name="value_unknown">--</string>
+
+    <string name="ride_state_parked">Parked</string>
+    <string name="ride_state_ready">Ready</string>
+    <string name="ride_state_riding">Riding</string>
+    <string name="ride_state_accelerating">Accelerating</string>
+    <string name="ride_state_motor_disabled">Motor disabled</string>
+
+    <string name="motor_label">Motor</string>
+    <string name="motor_on">ON</string>
+    <string name="motor_off">OFF</string>
+
+    <string name="kill_switch_label">Kill switch</string>
+    <string name="kill_switch_active">Active</string>
+    <string name="kill_switch_inactive">Inactive</string>
+
+    <string name="signal_lost_label">Vehicle signal</string>
+    <string name="signal_lost_value">Lost</string>
+    <string name="signal_lost">No signal from vehicle</string>
 </resources>

@@ -163,14 +163,34 @@ Motor and kill switch: `null` → Missing, otherwise Valid.
 Tests (`core/domain/src/test`, JVM, virtual time, `FakeVehicleRepository`, Turbine):
 `VehicleSignalValidatorTest`, `RideStateMachineTest`, `ObserveVehicleDashboardTest`.
 
-### Phase 3 — UI
-- `DashboardUiState.Content`: speed text, motor (ON/OFF), kill switch (Active/Inactive/Unknown),
-  ride state label, signal warning. `SignalLost` state.
-- Mapper does all formatting (rounding, "--" for Missing/Invalid).
-- Screen per the reference: big centre speed + km/h, ride-state label, motor pill bottom-right
-  (green ON / grey OFF), kill-switch indicator with distinct colour **and** icon/text (not colour alone).
-- Optional: animate speed changes (`animateIntAsState`), immersive mode.
-- Tests: ViewModel maps every `VehicleDashboard` case; mapper edge cases; optional Compose UI test.
+### Phase 3 — UI (done, in review)
+
+```
+VehicleDashboard ──► mapper (pure, all formatting) ──► DashboardUiState ──► DashboardScreen (stateless)
+```
+
+Layout, landscape, styled after the reference image (numbers are its item labels):
+
+| Element | Where | Looks like |
+|---|---|---|
+| Speed + km/h (#20) | centre, on the deck | big bold Manrope digits, sized from screen height; `--` when untrusted |
+| Speed deck (#23) | under the speed | dark 3D deck; light bar grows from the centre with speed, coloured by ride state |
+| Ride state (#5, #18) | top pod | strip + pill in the state colour; pill hidden when UNKNOWN |
+| Kill switch (#14) | top right | bolt icon + "Kill switch / Active" in red and white; Inactive dimmed grey; `--` when unknown |
+| Motor (#36) | bottom right | ON: dark green pill, green power icon. OFF: dark grey pill. `--` when unknown |
+| Signal lost | under the kill switch | amber "Vehicle signal / Lost"; every value shows `--` |
+| Connecting | full screen | "Connecting to vehicle…" |
+
+The other reference items (nav, music, ODO, battery, TPMS, parking slider) are left out: we have
+no data behind them. System bars are hidden; a swipe shows them.
+
+Status is never shown by colour alone: colour, icon and text change together.
+
+`DashboardUiState.Ride(speedKmh: Int?, rideState, motor: MotorState?, killSwitch: KillSwitchState?, signalLost)`;
+null means "--". Speed is rounded with `roundToInt()`.
+
+Tests: `DashboardUiStateMapperTest`, `DashboardViewModelTest` (JVM), `DashboardScreenTest`
+(Compose, `./gradlew :feature:dashboard:ui:connectedDebugAndroidTest` with an emulator running).
 
 ### Phase 4 — Docs and submission
 README (build/run, architecture, assumptions/limitations, how to run tests), screenshots, GitHub repo.
